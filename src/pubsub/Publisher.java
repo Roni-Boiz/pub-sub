@@ -6,25 +6,33 @@
 package pubsub;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 /**
  *
  * @author Ronila
  */
 public class Publisher {
-    private List<Subscriber> subscribers = new ArrayList<>();
+    private final Map<String, List<Subscriber>> subscribersByTopic = new HashMap<>();
 
-    public void addSubscriber(Subscriber subscriber) {
-        subscribers.add(subscriber);
+    public void addSubscriber(String topic, Subscriber subscriber) {
+        subscribersByTopic.computeIfAbsent(topic, k -> new ArrayList<>()).add(subscriber);
     }
 
-    public void removeSubscriber(Subscriber subscriber) {
-        subscribers.remove(subscriber);
+    public void removeSubscriber(String topic, Subscriber subscriber) {
+        List<Subscriber> subscribers = subscribersByTopic.get(topic);
+        if (subscribers != null) {
+            subscribers.remove(subscriber);
+        }
     }
 
-    public void publishMessage(String message) {
-        for (Subscriber subscriber : subscribers) {
-            subscriber.receiveMessage(message);
+    public void publishMessage(String topic, String message) {
+        List<Subscriber> subscribers = subscribersByTopic.get(topic);
+        if (subscribers != null) {
+            for (Subscriber subscriber : subscribers) {
+                subscriber.receiveMessage(message);
+            }
         }
     }
 }

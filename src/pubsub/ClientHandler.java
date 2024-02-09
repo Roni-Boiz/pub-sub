@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -25,6 +26,7 @@ public class ClientHandler implements Runnable, Subscriber {
     private final BufferedReader reader;
     private final BufferedWriter writer;
     private final String clientRole;
+    private ArrayList<String> clientTopics = new ArrayList<>();
 
     public ClientHandler(Socket clientSocket, Publisher publisher, Server server) throws IOException {
         this.clientSocket = clientSocket;
@@ -32,9 +34,15 @@ public class ClientHandler implements Runnable, Subscriber {
         this.server = server;
         this.reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
         this.writer = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
-        clientRole = reader.readLine();
+        this.clientRole = reader.readLine();
+        String[] topics = reader.readLine().split(" ");	
+        for (int i = 0; i < topics.length; i++) {
+            clientTopics.add(topics[i]);
+        }
         if(clientRole.equalsIgnoreCase("SUBSCRIBER")){
-            this.publisher.addSubscriber(this);
+            for (String topic : clientTopics) {
+                this.publisher.addSubscriber(topic, this);
+            } 
         }
     }
 
@@ -48,7 +56,9 @@ public class ClientHandler implements Runnable, Subscriber {
                 if (inputMessage == null || inputMessage.equalsIgnoreCase("TERMINATE") || inputMessage.equalsIgnoreCase("SERVER SHUTTING DOWN")) {
                     System.out.println("Client disconnected: " + clientSocket);
                     if(clientRole.equalsIgnoreCase("SUBSCRIBER")){
-                        this.publisher.removeSubscriber(this);
+                        for (String topic : clientTopics) {
+                            this.publisher.removeSubscriber(topic, this);
+                        } 
                     }
                     server.removeClient(this);
                     clientSocket.close();
@@ -58,14 +68,18 @@ public class ClientHandler implements Runnable, Subscriber {
                 System.out.println(inputMessage);
 
                 // Echo the message back to all subscribers
-                publisher.publishMessage(inputMessage.substring(inputMessage.indexOf(':') + 2).trim());
+                for (String topic : clientTopics) {
+                    publisher.publishMessage(topic, inputMessage.substring(inputMessage.indexOf(':') + 2).trim());
+                }      
             }
         } 
         catch (IOException e) {
             // Handle SocketException when the client disconnects abruptly
             System.out.println("Client disconnected abruptly: " + clientSocket);
             if(clientRole.equalsIgnoreCase("SUBSCRIBER")){
-                this.publisher.removeSubscriber(this);
+                for (String topic : clientTopics) {
+                    this.publisher.removeSubscriber(topic, this);
+                }
             }
             server.removeClient(this);
         }

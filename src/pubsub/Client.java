@@ -22,20 +22,29 @@ import java.util.logging.Logger;
  *
  * @author Ronila
  */
+class InvalidArgumentException extends Exception{
+    public InvalidArgumentException(String message) {
+        super(message);
+    }
+}
+
 public class Client {
     private final Socket socket;
     private BufferedReader reader;
     private BufferedWriter writer;
     private String username;
     private String role;
+    private StringBuffer topics;
 
-    public Client(Socket socket, BufferedReader reader, BufferedWriter writer, String username, String role) {
+    public Client(Socket socket, BufferedReader reader, BufferedWriter writer, String username, String role, StringBuffer topics) {
         this.socket = socket;
         this.reader = reader;
         this.writer = writer;
         this.username = username;
         this.role = role;
+        this.topics = topics;
         this.writeRole(role);
+        this.writeTopics(topics.toString());
     }
     
     // Take 1 : Clients can send and receive messages
@@ -145,6 +154,10 @@ public class Client {
         writeMessage(role);
     }
     
+    private void writeTopics(String topics){
+        writeMessage(topics);
+    }
+    
     private void writeMessage(String message) {
         try {
             writer.write(message);
@@ -157,8 +170,8 @@ public class Client {
     
     public static void main(String[] args) {
         
-        if (args.length != 4) {
-            System.out.println("Usage: java Client <server-address> <port> <username> <role>");
+        if (args.length < 5) {
+            System.out.println("Usage: java Client <server-address> <port> <username> <role> <topics>");
             System.exit(1);
         }
         
@@ -173,13 +186,28 @@ public class Client {
         String serverAddress = args[0];
         String username = args[2];
         String role = args[3];
+        String[] validArguments = {"PUBLISHER", "SUBSCRIBER"};
+        
+        try {
+            validateArguments(role, validArguments);
+        } catch (InvalidArgumentException e) {
+            System.out.println("Usage: java Client <server-address> <port> <username> <PUBLISHER|SUBSCRIBER>");
+            System.exit(1);
+        }
+        
+        StringBuffer topics = new StringBuffer();
+        if (args.length > 4) {
+            for (int i = 4; i < args.length; i++) {
+                topics.append(args[i]).append(" ");
+            }
+        }
         
         try {
             Socket socket = new Socket(serverAddress, port);        
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));    
             
-            Client client = new Client(socket, reader, writer, username, role);
+            Client client = new Client(socket, reader, writer, username, role, topics);
             client.sendOrReceiveMessages();
             
             // Register a shutdown hook to handle force stop or terminal close
@@ -209,5 +237,20 @@ public class Client {
         catch (IOException e) {
             e.printStackTrace();
         }
+    }
+    
+    private static void validateArguments(String argument, String[] validArguments) throws InvalidArgumentException {
+        if (!isValidArgument(argument, validArguments)) {
+            throw new InvalidArgumentException("Usage: java CommandLineArguments <PUBLISHER|SUBSCRIBER>");
+        }
+    }
+
+    private static boolean isValidArgument(String argument, String[] validArguments) {
+        for (String validArgument : validArguments) {
+            if (validArgument.equalsIgnoreCase(argument)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
